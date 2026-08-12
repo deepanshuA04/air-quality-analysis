@@ -9,7 +9,7 @@ import pandas as pd
 
 from air_quality_analysis.cleaning import clean_pipeline
 from air_quality_analysis.config import DB_PATH, REPORTS_DIR
-from air_quality_analysis.db import load_cleaned_to_sqlite
+from air_quality_analysis.db import apply_sql_views, load_cleaned_to_sqlite
 from air_quality_analysis.io_utils import load_tidy
 
 
@@ -18,7 +18,8 @@ def main() -> None:
     cleaned = clean_pipeline(tidy)
 
     load_cleaned_to_sqlite(cleaned, db_path=DB_PATH)
-    print(f"Loaded {len(cleaned):,} rows into {DB_PATH}")
+    apply_sql_views(db_path=DB_PATH)
+    print(f"Loaded {len(cleaned):,} rows into {DB_PATH} and applied SQL views")
 
     counts = cleaned["quality_flag"].value_counts()
     pct = (100 * counts / len(cleaned)).round(2)

@@ -125,6 +125,28 @@ low sensor uptime identified in the data-quality profile above (e.g. PM10,
 Xylene, Mumbai's pre-2018 PM2.5 gap) — those gaps are reported as missing,
 not invented.
 
+## SQL layer
+
+`sql/views.sql` defines the aggregation logic in SQL (applied by
+`db.apply_sql_views`, run automatically at the end of `clean_and_load.py`),
+so metric definitions live in one place that both the Python EDA and the
+Power BI dashboard read from — not duplicated in Pandas and DAX separately.
+
+| View | What it computes |
+|---|---|
+| `v_city_pollutant_daily` | Daily average per city+pollutant, `NULL` unless ≥18 of 24 hourly readings are present that day (avoids biasing a "daily average" off a handful of hours) |
+| `v_city_pollutant_daily_rolling30` | 30-day trailing rolling average, via a window function over the daily view |
+| `v_city_pollutant_monthly` | Monthly average per city+pollutant |
+| `v_city_pollutant_monthly_mom` | Month-over-month change, via `LAG()` over the monthly series |
+| `v_city_monthly_profile` | Average by calendar month (1-12), pooled across all years — the empirical seasonal profile |
+| `v_pm25_exceedance_days` | Per-city-day flag for PM2.5 daily average > 60 µg/m³ (CPCB 24h standard) |
+| `v_pm25_exceedance_summary` | Per-city count and % of days exceeding the standard |
+
+A first look at `v_pm25_exceedance_summary` already shows a wide spread:
+Delhi exceeds the CPCB PM2.5 24h standard on **73%** of valid days and
+Lucknow on 67%, versus Bengaluru at **9.6%** — the full breakdown and the
+seasonal profile that explains it are in the EDA section below.
+
 ## Reproducing this analysis
 
 ```bash
@@ -141,7 +163,7 @@ uv run python scripts/clean_and_load.py           # clean -> load into SQLite
 - [x] Milestone 1 — scaffold, CI, dataset sourcing decision
 - [x] Milestone 2 — data-quality profile
 - [x] Milestone 3 — cleaning pipeline + SQLite load
-- [ ] Milestone 4 — SQL views
+- [x] Milestone 4 — SQL views
 - [ ] Milestone 5 — time-series EDA
 - [ ] Milestone 6 — hypothesis testing (t-tests, ANOVA) + honesty section
 - [ ] Milestone 7 — Power BI dashboard
