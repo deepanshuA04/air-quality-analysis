@@ -1,0 +1,31 @@
+[project]
+name = "air-quality-analysis"
+version = "0.1.0"
+description = "Urban air quality trend and policy-impact analysis on CPCB data (8 Indian cities)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "scipy>=1.13",
+    "matplotlib>=3.9",
+    "seaborn>=0.13",
+    "kaggle>=1.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.2,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

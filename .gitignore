@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# uv
+uv.lock.bak
+
+# Kaggle credentials — never commit
+kaggle.json
+.kaggle/
+access_token
+
+# Data — raw dataset is large and reproducible via scripts/download_data.py
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/CHECKSUMS.sha256
+data/processed/*
+!data/processed/.gitkeep
+*.sqlite
+*.sqlite3
+*.db
+
+# Outputs
+reports/figures/*
+!reports/figures/.gitkeep
+
+# Power BI
+*.pbix.bak
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
