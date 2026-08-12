@@ -1,0 +1,9 @@
+city,expected_hours,non_null_readings,n_impossible,pct_missing,pct_impossible_of_readings
+Ahmedabad,578304,329690,2978,42.99,0.903
+Bengaluru,578304,475666,0,17.75,0.0
+Chennai,578304,445889,0,22.9,0.0
+Delhi,578304,549490,0,4.98,0.0
+Hyderabad,577284,536842,0,7.01,0.0
+Kolkata,234036,216260,0,7.6,0.0
+Lucknow,578304,420409,0,27.3,0.0
+Mumbai,578304,286080,0,50.53,0.0

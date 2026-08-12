@@ -56,19 +56,69 @@ available window rather than padded or excluded.
 readings from 8 Indian cities (2015-2020), cleaning missing and out-of-range
 sensor values using interpolation and outlier rules.*
 
+## Data-quality profile (before any cleaning)
+
+Computed by `uv run python scripts/build_quality_profile.py` on the raw
+tidy long-format frame (8 cities × 12 pollutants × hourly), before any
+cleaning rule runs. Full detail is written to `reports/quality_profile_full.csv`
+(540 city × pollutant × year rows); summaries below.
+
+**By city** (across all 12 pollutants and all years in that city's window):
+
+| City | Expected hours | Non-null readings | % missing | Impossible values |
+|---|---|---|---|---|
+| Delhi | 578,304 | 549,490 | 4.98% | 0 |
+| Hyderabad | 577,284 | 536,842 | 7.01% | 0 |
+| Kolkata | 234,036 | 216,260 | 7.60% | 0 |
+| Bengaluru | 578,304 | 475,666 | 17.75% | 0 |
+| Chennai | 578,304 | 445,889 | 22.90% | 0 |
+| Lucknow | 578,304 | 420,409 | 27.30% | 0 |
+| Ahmedabad | 578,304 | 329,690 | 42.99% | 2,978 (0.90% of readings, all CO) |
+| Mumbai | 578,304 | 286,080 | 50.53% | 0 |
+
+**By pollutant** (across all 8 cities and all years): PM10 (51.9% missing)
+and Xylene (60.5% missing) are the least-covered pollutants; CO, NOx, and
+Benzene are the best-covered (9-13% missing). PM2.5, the headline pollutant
+for this project, is 17.8% missing overall.
+
+**Impossible values found:** only in CO, and only in Ahmedabad — 2,978
+readings (0.9% of Ahmedabad's CO readings) above the 50 mg/m³ plausibility
+ceiling (see `config.PLAUSIBLE_CEILING`; CPCB's 24h CO standard is 2 mg/m³,
+so ambient readings above 50 mg/m³ indicate an instrument fault, not real
+air). No negative values and no exact-zero PM2.5/PM10 readings were present
+in this source file — the zero-is-impossible rule is implemented and unit
+tested but doesn't trigger on this particular dataset.
+
+**A miss worth flagging:** Mumbai's PM2.5 sensor reports **zero readings
+for all of 2015-2017** (100% missing those years), only starting in 2018 —
+this is why Mumbai's overall PM2.5 completeness (37.7%, see the coverage
+table above) is so much lower than its peers despite having a full
+2015-2020 row span. This is a real station-startup gap, not a bug, and is
+preserved rather than backfilled with fabricated pre-2018 values.
+
+### Cleaning rules
+
+| Rule | Function | Justification |
+|---|---|---|
+| Impossible values → missing | `cleaning.flag_impossible_values` | Negative concentrations are not physically possible; values above a documented per-pollutant ceiling (see `config.PLAUSIBLE_CEILING`) indicate an instrument fault, not a real reading; exact-zero PM2.5/PM10 indicates the particulate sensor was off (ambient PM is never truly zero) — restricted to PM2.5/PM10 because gaseous pollutants legitimately read zero near their detection limit. |
+| Short gaps (≤6h) → interpolated | `cleaning.interpolate_short_gaps` | A sensor dropout of a few hours is well-approximated by linear interpolation between the readings on either side of the gap. |
+| Long gaps (>6h) → left missing | `cleaning.interpolate_short_gaps` | Interpolating a multi-day or multi-week outage would invent data with no basis — these are left as `NaN` with a `missing_long_gap` quality flag rather than filled in. |
+| Outliers → flagged, not dropped | `cleaning.flag_outliers_iqr` | IQR fences computed **per city, per pollutant, per calendar month** (not a single global threshold) — Delhi winter PM2.5 routinely runs 300-900 µg/m³, which a global fence would flag as an outlier on every winter night. A per-month fence lets each city's own seasonal baseline define what's unusual for that city in that season. Flagged values are kept (with a flag) rather than removed, since "unusual for this city-month" is not the same as "wrong." |
+
 ## Reproducing this analysis
 
 ```bash
 uv sync --frozen
-uv run python scripts/download_data.py       # fetch raw CSVs (needs Kaggle credentials)
-# further pipeline steps (profiling, cleaning, SQL load, EDA, stats) are added
-# as the project progresses — see milestones below.
+uv run python scripts/download_data.py           # fetch raw CSVs (needs Kaggle credentials)
+uv run python scripts/build_quality_profile.py    # pre-cleaning data-quality profile -> reports/
+# further pipeline steps (cleaning, SQL load, EDA, stats) are added as the
+# project progresses — see milestones below.
 ```
 
 ## Project status
 
 - [x] Milestone 1 — scaffold, CI, dataset sourcing decision
-- [ ] Milestone 2 — data-quality profile
+- [x] Milestone 2 — data-quality profile
 - [ ] Milestone 3 — cleaning pipeline + SQLite load
 - [ ] Milestone 4 — SQL views
 - [ ] Milestone 5 — time-series EDA
