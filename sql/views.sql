@@ -35,21 +35,38 @@ GROUP BY city, pollutant, date(datetime);
 -- 30-day trailing rolling average of the daily series above. Because
 -- v_city_pollutant_daily has exactly one row per calendar date (even when
 -- avg_value is NULL), a 30-row window is a true 30-calendar-day window.
+-- Requires at least 10 of the 30 days to have data, so the very first
+-- window at the start of a city's coverage (or after a long gap) isn't a
+-- single noisy day masquerading as a 30-day average.
 CREATE VIEW v_city_pollutant_daily_rolling30 AS
 SELECT
     city,
     pollutant,
     date,
     avg_value,
-    ROUND(
-        AVG(avg_value) OVER (
+    n_days_in_window,
+    CASE WHEN n_days_in_window >= 10 THEN rolling_avg END AS rolling_30d_avg
+FROM (
+    SELECT
+        city,
+        pollutant,
+        date,
+        avg_value,
+        COUNT(avg_value) OVER (
             PARTITION BY city, pollutant
             ORDER BY date
             ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
-        ),
-        3
-    ) AS rolling_30d_avg
-FROM v_city_pollutant_daily;
+        ) AS n_days_in_window,
+        ROUND(
+            AVG(avg_value) OVER (
+                PARTITION BY city, pollutant
+                ORDER BY date
+                ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+            ),
+            3
+        ) AS rolling_avg
+    FROM v_city_pollutant_daily
+);
 
 -- One row per city + pollutant + calendar month (year-month), from the
 -- daily view so it inherits the same >=18h/day completeness rule.
