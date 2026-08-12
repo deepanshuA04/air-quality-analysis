@@ -2,66 +2,55 @@
 
 [![CI](https://github.com/deepanshuA04/air-quality-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/deepanshuA04/air-quality-analysis/actions/workflows/ci.yml)
 
-Analysis of hourly Central Pollution Control Board (CPCB) air-quality readings
-across 8 Indian cities: data cleaning, time-series trend analysis, and
-before/after hypothesis testing of real policy interventions, with a SQL layer
-and a Power BI monitoring dashboard.
+Cleaning, SQL aggregation, and time-series analysis of hourly CPCB air-quality
+data for 8 Indian cities, plus a before/after test of a real air-quality
+policy (Delhi's GRAP). Python/Pandas for cleaning, SQLite for the
+aggregation layer, Power BI for the dashboard.
 
-## Key findings & recommendation
+## Recommendation
 
-**Concentrate enforcement and public health advisories in the October-February
-window.** Across the 8 cities studied, average PM2.5 in this window is 123%
-higher than the rest of the year, and the pattern repeats every single year
-in the data (2015-2020) — it is not one bad winter dragging up an average.
-Delhi crosses the CPCB 24-hour PM2.5 standard on 73% of measured days
-overall; Bengaluru, on the other end, crosses it on 9.6% of days. A single
-national advisory calendar is a poor fit for both — the case for
-concentrating limited enforcement capacity (odd-even schemes, construction
-bans, stubble-burning coordination with neighboring states) in this specific
-five-month window is strongest for the northern/inland cities in the sample
-(Delhi, Lucknow, Kolkata, Ahmedabad), where winter PM2.5 runs 63-259% above
-the rest of the year, and weakest for the southern/coastal cities (Chennai,
-Bengaluru), where the seasonal swing is much smaller (18-45%).
+Enforcement and public advisories should be concentrated in October through
+February. Average PM2.5 across the 8 cities is 123% higher in that window
+than the rest of the year, and the pattern holds in every year of data from
+2015-2020 — it's not one bad winter skewing the average. Delhi breaches the
+CPCB 24-hour PM2.5 standard on 73% of measured days; Bengaluru breaches it
+on 9.6%. That gap is too large for a one-size-fits-all national advisory
+calendar — the winter push matters most for Delhi, Lucknow, Kolkata and
+Ahmedabad (63-259% winter increase), much less for Chennai and Bengaluru
+(18-45%).
 
-**On whether Delhi's GRAP policy is responsible for its improvement: the data
-does not support that conclusion.** Winter PM2.5 fell significantly in Delhi
-after GRAP started (-13.8%, p<0.001) — but it also fell significantly in
-five other cities where GRAP was never implemented, two of them by more than
-Delhi did. The honest takeaway for a policy audience is not "GRAP failed" or
-"GRAP worked" — it's that a before/after comparison on its own cannot tell
-the two apart, and claiming otherwise would overstate the evidence. See
-[What this analysis cannot tell you](#what-this-analysis-cannot-tell-you)
+One important caveat on the policy side: Delhi's winter PM2.5 dropped
+significantly after GRAP started enforcement in Oct 2017 (-13.8%,
+p<0.001), but so did five other cities where GRAP was never implemented —
+two of them by more than Delhi. That doesn't mean GRAP failed, but it does
+mean this data can't show that GRAP caused Delhi's improvement. Details in
+[Hypothesis testing](#hypothesis-testing-did-grap-change-delhis-winter-pm25)
 below.
 
-Everything below is the evidence and method behind these two paragraphs —
-every number in this README is reproduced by the scripts in `scripts/`, not
-typed by hand (`uv run python scripts/download_data.py && ... `, full
-sequence in [Reproducing this analysis](#reproducing-this-analysis)).
+Every number here comes out of the scripts in `scripts/` — see
+[Reproducing this analysis](#reproducing-this-analysis) to regenerate all
+of it from the raw CSV.
 
 ## Dataset
 
 | | |
 |---|---|
-| Source | [Air Quality Data in India (2015 - 2020)](https://www.kaggle.com/datasets/rohanrao/air-quality-data-in-india) by rohanrao on Kaggle, compiled from CPCB's public monitoring network |
-| Files used | `city_hour.csv` (hourly, city-level), `city_day.csv` (daily, cross-check only), `stations.csv` (station metadata) |
-| Download date | 2026-08-12 |
+| Source | [Air Quality Data in India (2015-2020)](https://www.kaggle.com/datasets/rohanrao/air-quality-data-in-india) by rohanrao on Kaggle, compiled from CPCB's public monitoring network |
+| Files used | `city_hour.csv` (hourly, city-level), `city_day.csv` (daily, used for cross-checking), `stations.csv` |
+| Downloaded | 2026-08-12 |
 | License | CC0-1.0 (public domain) |
-| Reproducing the download | `uv run python scripts/download_data.py` (requires a Kaggle API token; see [Kaggle API docs](https://www.kaggle.com/docs/api)). Downloaded files are checksummed against `data/raw/CHECKSUMS.sha256`. |
+| Getting the data | `uv run python scripts/download_data.py` (needs a Kaggle API token — see [Kaggle API docs](https://www.kaggle.com/docs/api)). Files are checksummed against `data/raw/CHECKSUMS.sha256`. |
 
-### Coverage vs. the original plan
+The project was originally scoped for 2019-2024 across 8 cities. The real
+file covers **2015-01-01 to 2020-07-01** — CPCB's own hourly aggregation
+(and this Kaggle mirror of it) doesn't go past mid-2020. Rather than force
+the numbers to match the original plan, the analysis below uses the real
+window and says so.
 
-The project was scoped assuming 2019-2024 coverage. The real dataset's hourly
-city-level file (`city_hour.csv`) covers **2015-01-01 to 2020-07-01** — it
-stops before 2024 because CPCB's own aggregation (and the Kaggle mirror of
-it) ends there. The date range below reflects what the data actually
-contains, not the original plan.
-
-Of 26 cities in the raw file, coverage length and completeness vary widely
-(full 2015-2020 span in some, a few months in others — see the
-`stations.csv`/`city_hour.csv` breakdown reproduced by
-`scripts/build_quality_profile.py`). The 8 cities selected for this analysis
-are the largest metros with the longest usable time series, giving both
-geographic spread and enough pre/post history for the intervention analysis:
+Of the 26 cities in the raw file, coverage varies a lot — some run the full
+5.5 years, others start partway through. The 8 used here are the ones with
+the longest, most complete series, which also happens to give reasonable
+geographic spread:
 
 **Delhi, Mumbai, Kolkata, Chennai, Bengaluru, Hyderabad, Ahmedabad, Lucknow**
 
@@ -76,25 +65,19 @@ geographic spread and enough pre/post history for the intervention analysis:
 | Hyderabad | 48,107 | 2015-01-04 → 2020-07-01 | 92.5% |
 | Kolkata | 19,503 | 2018-04-10 → 2020-07-01 | 92.6% |
 
-Across these 8 cities, the raw file contains **356,762 city-hour rows** and,
-melted to one row per city-hour-pollutant (12 pollutants tracked), **~3.26
-million non-null pollutant readings** — above the originally planned 1.2M+,
-just over a shorter and earlier window (Jan 2015-Jul 2020) than 2019-2024.
-Kolkata's monitoring only starts in April 2018 and is analyzed on its
-available window rather than padded or excluded.
+That's 356,762 city-hour rows, or about 3.26 million individual pollutant
+readings once melted to one row per city-hour-pollutant across the 12
+pollutants tracked (PM2.5, PM10, NO, NO2, NOx, NH3, CO, SO2, O3, Benzene,
+Toluene, Xylene) — comfortably above the original 1.2M+ target, just over a
+shorter and earlier window than planned.
 
-**Resume bullet, updated to match reality:** *Analyzed 3.2M+ hourly pollutant
-readings from 8 Indian cities (2015-2020), cleaning missing and out-of-range
-sensor values using interpolation and outlier rules.*
+## Data-quality profile
 
-## Data-quality profile (before any cleaning)
+Built by `uv run python scripts/build_quality_profile.py`, on the raw data
+before any cleaning runs. Full detail in
+`reports/quality_profile_full.csv` (540 city × pollutant × year rows).
 
-Computed by `uv run python scripts/build_quality_profile.py` on the raw
-tidy long-format frame (8 cities × 12 pollutants × hourly), before any
-cleaning rule runs. Full detail is written to `reports/quality_profile_full.csv`
-(540 city × pollutant × year rows); summaries below.
-
-**By city** (across all 12 pollutants and all years in that city's window):
+By city, across all 12 pollutants and all years in that city's window:
 
 | City | Expected hours | Non-null readings | % missing | Impossible values |
 |---|---|---|---|---|
@@ -104,322 +87,237 @@ cleaning rule runs. Full detail is written to `reports/quality_profile_full.csv`
 | Bengaluru | 578,304 | 475,666 | 17.75% | 0 |
 | Chennai | 578,304 | 445,889 | 22.90% | 0 |
 | Lucknow | 578,304 | 420,409 | 27.30% | 0 |
-| Ahmedabad | 578,304 | 329,690 | 42.99% | 2,978 (0.90% of readings, all CO) |
+| Ahmedabad | 578,304 | 329,690 | 42.99% | 2,978 (all CO) |
 | Mumbai | 578,304 | 286,080 | 50.53% | 0 |
 
-**By pollutant** (across all 8 cities and all years): PM10 (51.9% missing)
-and Xylene (60.5% missing) are the least-covered pollutants; CO, NOx, and
-Benzene are the best-covered (9-13% missing). PM2.5, the headline pollutant
-for this project, is 17.8% missing overall.
+PM10 and Xylene are the worst-covered pollutants (52% and 60% missing);
+CO, NOx and Benzene are the best (9-13%). PM2.5, the pollutant most of this
+analysis centers on, is 17.8% missing overall.
 
-**Impossible values found:** only in CO, and only in Ahmedabad — 2,978
-readings (0.9% of Ahmedabad's CO readings) above the 50 mg/m³ plausibility
-ceiling (see `config.PLAUSIBLE_CEILING`; CPCB's 24h CO standard is 2 mg/m³,
-so ambient readings above 50 mg/m³ indicate an instrument fault, not real
-air). No negative values and no exact-zero PM2.5/PM10 readings were present
-in this source file — the zero-is-impossible rule is implemented and unit
-tested but doesn't trigger on this particular dataset.
+The only impossible values found are 2,978 CO readings in Ahmedabad, 0.9%
+of its CO data, above the 50 mg/m³ ceiling used here (CPCB's 24h CO
+standard is 2 mg/m³, so anything above 50 in ambient air is an instrument
+fault, not a real reading — see `config.PLAUSIBLE_CEILING`). No negative
+values anywhere, and no exact-zero PM2.5/PM10 readings in this file — the
+rule for treating a zero particulate reading as "sensor off" is
+implemented and tested but doesn't actually fire on this data.
 
-**A miss worth flagging:** Mumbai's PM2.5 sensor reports **zero readings
-for all of 2015-2017** (100% missing those years), only starting in 2018 —
-this is why Mumbai's overall PM2.5 completeness (37.7%, see the coverage
-table above) is so much lower than its peers despite having a full
-2015-2020 row span. This is a real station-startup gap, not a bug, and is
-preserved rather than backfilled with fabricated pre-2018 values.
+One gap worth calling out directly: Mumbai's PM2.5 sensor has zero
+readings for 2015-2017, and only starts reporting in 2018. That's the
+whole reason Mumbai's completeness number above (37.7%) is so much worse
+than cities with a similar row count — it's a real station-startup gap,
+not something to interpolate over.
 
 ### Cleaning rules
 
-| Rule | Function | Justification |
+| Rule | Function | Why |
 |---|---|---|
-| Impossible values → missing | `cleaning.flag_impossible_values` | Negative concentrations are not physically possible; values above a documented per-pollutant ceiling (see `config.PLAUSIBLE_CEILING`) indicate an instrument fault, not a real reading; exact-zero PM2.5/PM10 indicates the particulate sensor was off (ambient PM is never truly zero) — restricted to PM2.5/PM10 because gaseous pollutants legitimately read zero near their detection limit. |
-| Short gaps (≤6h) → interpolated | `cleaning.interpolate_short_gaps` | A sensor dropout of a few hours is well-approximated by linear interpolation between the readings on either side of the gap. |
-| Long gaps (>6h) → left missing | `cleaning.interpolate_short_gaps` | Interpolating a multi-day or multi-week outage would invent data with no basis — these are left as `NaN` with a `missing_long_gap` quality flag rather than filled in. |
-| Outliers → flagged, not dropped | `cleaning.flag_outliers_iqr` | IQR fences computed **per city, per pollutant, per calendar month** (not a single global threshold) — Delhi winter PM2.5 routinely runs 300-900 µg/m³, which a global fence would flag as an outlier on every winter night. A per-month fence lets each city's own seasonal baseline define what's unusual for that city in that season. Flagged values are kept (with a flag) rather than removed, since "unusual for this city-month" is not the same as "wrong." |
+| Impossible values → missing | `cleaning.flag_impossible_values` | Negative concentrations can't exist; values above a per-pollutant ceiling (`config.PLAUSIBLE_CEILING`) are instrument faults, not readings; exact-zero PM2.5/PM10 means the particulate sensor was off (ambient PM is never truly zero) — this only applies to PM2.5/PM10 because gases legitimately read zero near their detection limit. |
+| Short gaps (≤6h) → interpolated | `cleaning.interpolate_short_gaps` | A few missing hours is well approximated by a straight line between the readings on either side. |
+| Long gaps (>6h) → left missing | `cleaning.interpolate_short_gaps` | Interpolating across a multi-day outage would just be making up data. Left as `NaN` with a `missing_long_gap` flag. |
+| Outliers → flagged, not dropped | `cleaning.flag_outliers_iqr` | IQR fences are computed per city, per pollutant, per calendar month — not one global threshold. Delhi's winter PM2.5 routinely sits at 300-900 µg/m³, which a global fence would flag on almost every winter night. A per-month fence judges each city against its own seasonal baseline. Flagged values are kept, since "unusual for this city in this month" isn't the same as "wrong." |
 
-### Cleaning pipeline results
+Running `uv run python scripts/clean_and_load.py` applies these three
+rules in order (impossible → interpolate → outlier flag) to all 4,281,144
+city-hour-pollutant rows and loads the result into SQLite:
 
-Run by `uv run python scripts/clean_and_load.py`, which applies the four
-rules above (in order: impossible → interpolate short gaps → flag seasonal
-outliers) to all 4,281,144 city×hour×pollutant rows and loads the result
-into SQLite (`data/processed/air_quality.sqlite`, gitignored — rebuilt by
-the script, not committed):
-
-| `quality_flag` | Rows | % of total |
+| `quality_flag` | Rows | % |
 |---|---|---|
-| `ok` (genuine reading, unflagged) | 3,075,675 | 71.84% |
-| `missing_long_gap` (left missing — gap too long or unbounded) | 991,126 | 23.15% |
-| `outlier_seasonal` (genuine reading, unusual for its city-month) | 181,673 | 4.24% |
-| `interpolated` (short gap, linearly filled) | 32,670 | 0.76% |
+| `ok` | 3,075,675 | 71.84% |
+| `missing_long_gap` | 991,126 | 23.15% |
+| `outlier_seasonal` | 181,673 | 4.24% |
+| `interpolated` | 32,670 | 0.76% |
 
-The `missing_long_gap` share (23%) is dominated by pollutants/cities with
-low sensor uptime identified in the data-quality profile above (e.g. PM10,
-Xylene, Mumbai's pre-2018 PM2.5 gap) — those gaps are reported as missing,
-not invented.
+Most of that 23% missing comes from the low-uptime pollutants/cities
+already visible in the profile above (PM10, Xylene, Mumbai pre-2018).
 
 ## SQL layer
 
-`sql/views.sql` defines the aggregation logic in SQL (applied by
-`db.apply_sql_views`, run automatically at the end of `clean_and_load.py`),
-so metric definitions live in one place that both the Python EDA and the
-Power BI dashboard read from — not duplicated in Pandas and DAX separately.
+`sql/views.sql` holds the aggregation logic — daily/monthly averages,
+rolling windows, exceedance days — so both the Python EDA and the Power BI
+dashboard read from the same view instead of two separate implementations.
+Applied automatically at the end of `clean_and_load.py`.
 
-| View | What it computes |
+| View | Computes |
 |---|---|
-| `v_city_pollutant_daily` | Daily average per city+pollutant, `NULL` unless ≥18 of 24 hourly readings are present that day (avoids biasing a "daily average" off a handful of hours) |
-| `v_city_pollutant_daily_rolling30` | 30-day trailing rolling average, via a window function over the daily view |
+| `v_city_pollutant_daily` | Daily average per city+pollutant; `NULL` unless ≥18 of 24 hours are present that day |
+| `v_city_pollutant_daily_rolling30` | 30-day trailing rolling average (window function over the daily view) |
 | `v_city_pollutant_monthly` | Monthly average per city+pollutant |
-| `v_city_pollutant_monthly_mom` | Month-over-month change, via `LAG()` over the monthly series |
-| `v_city_monthly_profile` | Average by calendar month (1-12), pooled across all years — the empirical seasonal profile |
-| `v_pm25_exceedance_days` | Per-city-day flag for PM2.5 daily average > 60 µg/m³ (CPCB 24h standard) |
-| `v_pm25_exceedance_summary` | Per-city count and % of days exceeding the standard |
+| `v_city_pollutant_monthly_mom` | Month-over-month change via `LAG()` |
+| `v_city_monthly_profile` | Average by calendar month, pooled across years — the seasonal profile |
+| `v_pm25_exceedance_days` | Per-day flag for PM2.5 > 60 µg/m³ (CPCB 24h standard) |
+| `v_pm25_exceedance_summary` | Per-city exceedance-day count and % |
 
-A first look at `v_pm25_exceedance_summary` already shows a wide spread:
-Delhi exceeds the CPCB PM2.5 24h standard on **73%** of valid days and
-Lucknow on 67%, versus Bengaluru at **9.6%** — the full breakdown and the
-seasonal profile that explains it are in the EDA section below.
+Delhi exceeds the standard on 73% of valid days, Lucknow on 67%, versus
+9.6% for Bengaluru — more on this below.
 
 ## Time-series EDA
 
-Generated by `uv run python scripts/run_eda.py`, reading from the SQL views
-above.
+Generated by `uv run python scripts/run_eda.py`.
 
-### 30-day rolling average, PM2.5, by city
+### 30-day rolling average, PM2.5
 
 ![PM2.5 30-day rolling average by city](reports/figures/rolling30_PM25.png)
 
-Small multiples (one panel per city) rather than 8 overlaid lines — at this
-series count, 8 overlapping noisy lines are harder to read than 8 clean
-panels, and it keeps the chart accessible without relying on 8
-simultaneously-distinguishable hues. Gaps in Mumbai (pre-2018), Kolkata
-(pre-2018), and Ahmedabad (2016-2017, 2017-2018) are the same coverage
-gaps surfaced in the data-quality profile — left blank, not interpolated
-across, because they're multi-month gaps far past the 6-hour interpolation
-rule.
+One panel per city rather than 8 overlapping lines — with this many
+series, small multiples are just easier to read. The gaps in Mumbai,
+Kolkata and part of Ahmedabad's series are the same coverage holes from
+the data-quality profile, left blank rather than bridged (they're
+multi-month gaps, well past the 6-hour interpolation cutoff).
 
-### Seasonal profile — empirically identifying the high-risk window
+### Seasonal profile
 
 ![PM2.5 seasonal profile by calendar month](reports/figures/seasonal_profile_PM25.png)
 
-Rather than assuming an October-January window, the high-risk months are
-identified as whichever calendar months have a pooled (mean-of-city-means)
-PM2.5 average above the pooled annual mean. That test returns
-**October through February** — one month later than the original plan,
-because February is still clearly elevated (pooled mean 87 µg/m³, above
-October's 76) before the drop into March.
+Instead of assuming an October-January window, this takes whichever
+calendar months have a pooled PM2.5 average above the pooled annual mean.
+That comes out to **October through February** — a month later than
+originally assumed, because February (87 µg/m³ pooled) is still clearly
+elevated above October (76) before the drop into March.
 
-### Quantifying the winter spike (Oct-Feb vs. the rest of the year)
+### Winter spike by city
 
-| City | Winter-window mean | Non-winter mean | % increase |
+| City | Winter mean | Non-winter mean | % increase |
 |---|---|---|---|
-| Kolkata | 113.8 | 31.7 | **+258.7%** |
-| Mumbai | 61.4 | 19.3 | **+217.8%** |
-| Delhi | 184.8 | 71.3 | **+159.1%** |
-| Lucknow | 172.1 | 68.5 | **+151.2%** |
+| Kolkata | 113.8 | 31.7 | +258.7% |
+| Mumbai | 61.4 | 19.3 | +217.8% |
+| Delhi | 184.8 | 71.3 | +159.1% |
+| Lucknow | 172.1 | 68.5 | +151.2% |
 | Hyderabad | 63.3 | 36.5 | +73.3% |
 | Ahmedabad | 88.4 | 54.1 | +63.2% |
 | Bengaluru | 43.5 | 30.0 | +45.4% |
 | Chennai | 55.5 | 46.9 | +18.4% |
 
-**Averaged across the 8 cities, the winter-window PM2.5 mean is 123% above
-the non-winter mean** (`reports/winter_spike_by_city.csv`) — but that
-average hides a genuine split: the four northern/inland cities (Kolkata,
-Delhi, Lucknow) plus Mumbai see a >150% winter jump, while the four
-southern/coastal cities (Hyderabad, Ahmedabad, Bengaluru, Chennai) see a
-much smaller 18-73% one. Chennai in particular barely has a winter season
-in its PM2.5 — this is reported with the same prominence as the cities
-that spike, not smoothed into the headline average.
+Averaged across all 8 cities the winter mean is 123% above the non-winter
+mean (`reports/winter_spike_by_city.csv`), but that single number hides a
+real split: Kolkata, Delhi, Lucknow and Mumbai all see well over 150%,
+while Chennai and Bengaluru barely have a winter season in their PM2.5 at
+all.
 
-### Year-on-year: is every winter bad, or was one winter bad?
+### Year-on-year: recurring pattern, or one bad winter?
 
 ![Delhi PM2.5 year-on-year by month](reports/figures/yoy_delhi_PM25.png)
 
-For Delhi, every one of the 6 years shows the same Oct-Feb rise and
-Jul-Aug trough — this is a structural seasonal pattern, not a single bad
-year dragging up the average. (2020 stops in July because the raw file's
-coverage ends 2020-07-01, not because the pattern changed.)
-
-**Resume bullet, updated to match reality:** *Performed time-series EDA
-with 30-day rolling averages and year-on-year comparisons, identifying a
-recurring PM2.5 spike in the October-February window (123% above the
-non-winter mean, averaged across 8 cities) — one month later than
-originally assumed, and far more pronounced in northern/inland cities
-than southern/coastal ones.*
+Every one of Delhi's 6 years shows the same October-February rise and
+July-August trough. It's a structural seasonal pattern, not a single year
+dragging up the average. (2020 stops in July because that's where the raw
+file's coverage ends, not because the pattern changed.)
 
 ## Hypothesis testing: did GRAP change Delhi's winter PM2.5?
 
-**Intervention:** the Graded Response Action Plan (GRAP) for Delhi-NCR,
-notified 17 Jan 2017 and first operationally enforced from 17 Oct 2017
+**The intervention:** Delhi-NCR's Graded Response Action Plan (GRAP),
+notified 17 Jan 2017 and operationally enforced from 17 Oct 2017
 ([source](https://www.cseindia.org/graded-response-action-plan-to-control-air-pollution-in-delhi-ncr-in-very-poor-and-severe-categories-comes-into-effect-from-october-17-2017-says-epca-8506)).
-GRAP applies only to Delhi-NCR — of the 8 cities studied, only Delhi is in
-scope.
+It applies only to Delhi-NCR, so of the 8 cities studied, only Delhi is
+actually covered by the policy.
 
-**Method:** Welch's t-test comparing daily PM2.5 in the same Oct-Feb
-calendar window every year (so the comparison isn't confounded by season),
-2 pre-GRAP winters (2015-16, 2016-17) vs. 3 post-GRAP winters (2017-18,
-2018-19, 2019-20). The same test is run for **all 8 cities**, not just
-Delhi — most don't fall under GRAP, so this doubles as an informal check
-on whether "Delhi improved" is actually a GRAP effect or something
-broader. Run by `uv run python scripts/run_stats.py`.
+**Method:** Welch's t-test on daily PM2.5 in the same Oct-Feb window every
+year, so season doesn't confound the comparison — 2 pre-GRAP winters
+(2015-16, 2016-17) against 3 post-GRAP winters (2017-18 through 2019-20).
+The same test is run for all 8 cities, not just Delhi, since most of them
+were never under GRAP — that turns the other 7 into a rough sanity check
+on whether "Delhi improved" really is a GRAP story. Run by
+`uv run python scripts/run_stats.py`.
 
 ![GRAP before/after winter PM2.5 by city](reports/figures/grap_before_after_pm25.png)
 
-| City | GRAP applies? | n (pre / post) | Mean pre | Mean post | % change | p-value | Cohen's d |
+| City | Under GRAP? | n (pre / post) | Mean pre | Mean post | % change | p-value | Cohen's d |
 |---|---|---|---|---|---|---|---|
 | Delhi | Yes | 302 / 454 | 203.1 | 175.2 | -13.8% | 0.00002 | -0.32 |
 | Lucknow | No | 297 / 454 | 187.7 | 161.8 | -13.8% | 0.00001 | -0.34 |
-| Ahmedabad | No | **58** / 402 | 116.1 | 82.5 | -28.9% | 0.00044 | -0.86 |
+| Ahmedabad | No | 58 / 402 | 116.1 | 82.5 | -28.9% | 0.00044 | -0.86 |
 | Hyderabad | No | 288 / 446 | 71.8 | 57.8 | -19.5% | 0.00001 | -0.40 |
 | Chennai | No | 275 / 454 | 60.2 | 52.6 | -12.7% | 0.00035 | -0.27 |
 | Bengaluru | No | 288 / 447 | 46.2 | 41.9 | -9.3% | 0.0103 | -0.20 |
-| Mumbai | No | **0** / 291 | — | 61.4 | — | insufficient pre-GRAP data | — |
-| Kolkata | No | **0** / 303 | — | 113.8 | — | insufficient pre-GRAP data | — |
+| Mumbai | No | 0 / 291 | — | 61.4 | — | insufficient pre-GRAP data | — |
+| Kolkata | No | 0 / 303 | — | 113.8 | — | insufficient pre-GRAP data | — |
 
-Full output: `reports/grap_before_after.csv`.
+Full output in `reports/grap_before_after.csv`. Ahmedabad's pre-GRAP
+sample is real but thin (58 days against ~300 for the other testable
+cities), a consequence of the same coverage gaps in the data-quality
+profile — worth weighting that result accordingly. Mumbai and Kolkata
+can't be tested at all: both have zero valid PM2.5 days in the pre-GRAP
+window (Mumbai's sensor wasn't reporting yet; Kolkata's station didn't
+exist until April 2018).
 
-### One-way ANOVA: does PM2.5 differ across the 8 cities?
+**One-way ANOVA** across all 8 cities, full study period: F = 607.8,
+p < 0.001, η² = 0.26 — city explains about a quarter of the variance in
+daily PM2.5. Group means range from ~35 µg/m³ (Bengaluru, Mumbai) to 118
+(Delhi) and 110 (Lucknow); full table in `reports/anova_pm25_group_means.csv`.
 
-Full study period, daily PM2.5 averages, all 8 cities as groups:
-**F = 607.8, p < 0.001, η² = 0.26** — city is associated with about 26% of
-the variance in daily PM2.5. Group means range from Bengaluru/Mumbai
-(~35 µg/m³) to Delhi (118 µg/m³) and Lucknow (110 µg/m³); full table in
-`reports/anova_pm25_group_means.csv`.
+**Reading the GRAP result honestly:** every one of the 6 testable cities
+shows a statistically significant winter PM2.5 decrease after Oct 2017,
+including five where GRAP never applied — and Delhi's decline (-13.8%) is
+smaller than Ahmedabad's (-28.9%) or Hyderabad's (-19.5%), neither of
+which had any GRAP-style policy. That's not proof GRAP did nothing, but it
+does mean a plain before/after comparison can't separate a GRAP effect
+from whatever else was driving pollution down across most of urban India
+in this period — could be weather variation between the two specific
+pre-GRAP winters, a broader national trend, or changes in the monitoring
+network itself.
 
-### The honest reading of the GRAP result
-
-Every one of the 6 testable cities shows a **statistically significant
-decrease** in winter PM2.5 after Oct 2017 — including five cities where
-GRAP was never implemented. Delhi's decline (-13.8%) is smaller in
-percentage terms than Ahmedabad's (-28.9%) and Hyderabad's (-19.5%),
-neither of which is under GRAP. **This is not evidence that GRAP had no
-effect — but it is clear evidence that a simple before/after comparison
-cannot isolate one.** If a policy that only applies to Delhi produced a
-Delhi improvement no larger than the improvement in cities with no such
-policy, the most defensible reading is that something broader than GRAP
-(year-to-year weather variability, a general improving trend across urban
-India in this period, monitoring/instrumentation changes, or the specific
-two pre-GRAP winters happening to be unusually bad) is driving most of
-what this test measures.
-
-**Data-coverage misses, reported rather than hidden:** Mumbai and Kolkata
-have **zero** valid PM2.5 days in the pre-GRAP window (Mumbai's PM2.5
-sensor didn't report until 2018; Kolkata's station started in April 2018)
-— they cannot be tested for this comparison at all, and are reported as
-"insufficient data," not silently dropped or padded. Ahmedabad's pre-GRAP
-sample is real but thin (58 days vs. ~300 for other cities) because of the
-coverage gaps documented in the data-quality profile; its result is
-included but should be weighted with that in mind.
-
-### What this analysis cannot tell you
-
-This is a before/after observational comparison of two non-randomly-chosen
-time windows, not a controlled experiment, and it cannot establish that
-GRAP *caused* any change in PM2.5. Weather varies year to year and was not
-controlled for; India's COVID-19 lockdown (from 25 Mar 2020) falls inside
-the post-GRAP window and suppressed traffic/industrial emissions for
-reasons entirely unrelated to GRAP; other concurrent policies (odd-even
-vehicle rationing, the 2017 Delhi-NCR firecracker restrictions, BS-VI fuel
-standards from Apr 2020) overlap the same post-period and cannot be
-separated from GRAP's effect with this method; and CPCB's monitoring
-network itself changed over this period (new stations coming online, as
-seen directly in Kolkata's and Mumbai's coverage gaps), which can shift a
-city's measured average independent of true ambient pollution. Concluding
-"GRAP reduced Delhi's PM2.5 by 13.8%" from this analysis alone would be
-overstating what a two-sample t-test on observational time-series data can
-support — the ANOVA and t-test results describe what the data shows, not
-what a specific policy caused.
-
-**Resume bullet, updated to match reality:** *Ran Welch's t-tests and a
-one-way ANOVA to compare pollution levels before and after a real policy
-intervention (Delhi's GRAP), finding that the same "significant
-improvement" pattern also appears in cities the policy never applied to
-— reported as a caution against attributing the change to the policy,
-alongside two cities with too little pre-period data to test at all.*
+This is also just an observational before/after comparison, not a
+controlled experiment, so a few things it genuinely can't tell you:
+weather wasn't controlled for; the COVID-19 lockdown (from 25 Mar 2020)
+falls inside the post-GRAP window and suppressed emissions for reasons
+that have nothing to do with GRAP; other overlapping policies (odd-even
+rationing, the 2017 firecracker restrictions, BS-VI fuel from Apr 2020)
+can't be separated out with this method; and CPCB's monitoring network
+changed during this period too (new stations coming online, visible
+directly in Kolkata's and Mumbai's coverage gaps), which can shift a
+city's measured average independent of actual air quality. "GRAP reduced
+Delhi's PM2.5 by 13.8%" is more than this analysis can support on its own.
 
 ## Power BI dashboard
 
-Not yet built. The data it needs is ready: `uv run python
-scripts/export_powerbi_views.py` exports every SQL view in `sql/views.sql`
-to `powerbi/data/*.csv`, so metric definitions stay in SQL rather than
-being re-derived in DAX. Planned pages: (1) city comparison overview —
-trend lines + exceedance-day counts, from `v_city_pollutant_daily` /
-`v_pm25_exceedance_summary`; (2) single-city drill-down — rolling average
-+ seasonal profile, from `v_city_pollutant_daily_rolling30` /
-`v_city_monthly_profile`; (3) GRAP before/after — group means, from
-`reports/grap_before_after.csv`. Screenshots and the `.pbix` will be added
-here once built.
+Not built yet — Power BI Desktop is a GUI tool with no scriptable path, so
+this needs to be done by hand rather than by a script. The data is ready:
+`uv run python scripts/export_powerbi_views.py` exports every SQL view to
+`powerbi/data/*.csv`, so the dashboard reads metric definitions from SQL
+instead of redoing them in DAX. Planned: a city comparison page (trend
+lines + exceedance counts), a single-city drill-down (rolling average +
+seasonal profile), and a GRAP before/after page. Screenshots and the
+`.pbix` go here once it exists.
 
 ## Limitations
 
-Beyond the GRAP-specific caveats above, some project-wide scope decisions
-are worth stating plainly rather than leaving implicit:
-
-- **The statistical toolkit is deliberately simple** — rolling averages,
-  year-on-year comparison, Welch's t-tests, one-way ANOVA, and the
-  correlation/effect-size reporting that goes with them. Nothing here uses
-  seasonal decomposition (STL), ARIMA, or a causal-inference framework
-  (difference-in-differences, synthetic control). The seasonal pattern in
-  this data is visually and empirically obvious enough (see the seasonal
-  profile chart) that a decomposition model isn't needed to detect it; a
-  proper causal estimate of GRAP's effect would need one of those causal
-  frameworks (plus weather and traffic controls this dataset doesn't have)
-  and is explicitly out of scope here rather than approximated with a
-  simpler test dressed up as one.
-- **No multiple-comparisons correction was applied** across the 6 GRAP
-  t-tests. At α=0.05 across 6 independent tests, some chance of at least
-  one false positive exists by construction. What makes chance an
-  unconvincing full explanation here is that all 6 tests agreed in
-  direction and five of six were significant at p<0.02 — but this is a
-  scope simplification (per this project's brief, Holm/Bonferroni-style
-  corrections were deliberately left out as beyond entry-level scope), not
-  a claim that correction wouldn't matter in a stricter analysis.
-- **The 8 cities are the highest-coverage cities in the source file, not a
-  random or representative sample** of Indian cities — see "Coverage vs.
-  the original plan" above. Findings describe these 8 cities specifically.
-- **PM2.5 is the analytical focus.** The cleaned dataset and SQL views
-  cover all 12 monitored pollutants (PM10, NO, NO2, NOx, NH3, CO, SO2, O3,
-  Benzene, Toluene, Xylene), but the EDA, hypothesis testing, and
-  recommendation concentrate on PM2.5 as the dominant public-health
-  pollutant in Indian winters. The other pollutants are cleaned,
-  queryable, and available in `powerbi/data/`, but not deeply analyzed
-  here.
-- **Missing data is left missing, not imputed, for gaps beyond 6 hours** —
-  by design (see the cleaning rules table) — which means every average in
-  this README is computed only over the hours/days that were actually
-  measured. If sensors are systematically more likely to go offline during
-  the worst pollution events (a plausible failure mode for real hardware),
-  the true winter spike could be even larger than what's reported here;
-  this dataset cannot confirm or rule that out.
-- **The Power BI dashboard (milestone 7) is not yet built** — see the
-  Power BI section above for what's ready and what's planned.
+- The statistical toolkit is intentionally basic — rolling averages,
+  year-on-year comparison, t-tests, one-way ANOVA. No seasonal
+  decomposition, no ARIMA, no causal-inference framework
+  (difference-in-differences, synthetic control). The seasonal pattern is
+  obvious enough without a decomposition model; a real causal estimate of
+  GRAP's effect would need weather/traffic controls this dataset doesn't
+  have, and that's out of scope here rather than faked with a simpler test.
+- No multiple-comparisons correction across the 6 GRAP t-tests — at
+  α=0.05 across 6 tests there's some chance of a false positive by
+  construction, though all 6 agreed in direction and 5 were significant at
+  p<0.02. Left uncorrected as a scope decision, not because it's the
+  statistically ideal approach.
+- The 8 cities are the ones with the best data coverage in the source
+  file, not a random sample — the findings describe these 8 specifically.
+- PM2.5 is the focus pollutant. The other 11 (PM10, NO, NO2, NOx, NH3, CO,
+  SO2, O3, Benzene, Toluene, Xylene) are cleaned and queryable but not
+  deeply analyzed here.
+- Gaps over 6 hours are left missing rather than filled, so every average
+  here is computed only from the hours actually measured. If sensors are
+  more likely to fail during the worst pollution events, the real winter
+  spike could be larger than what's reported.
 
 ## Reproducing this analysis
 
 ```bash
 uv sync --frozen
 uv run python scripts/download_data.py    # fetch raw CSVs once (needs a Kaggle API token)
-uv run python scripts/run_pipeline.py     # everything else: profile -> clean -> SQLite ->
-                                           # SQL views -> EDA figures -> hypothesis tests ->
-                                           # Power BI CSV export
+uv run python scripts/run_pipeline.py     # profile -> clean -> SQLite -> SQL views ->
+                                           # EDA figures -> hypothesis tests -> Power BI export
 ```
 
-`run_pipeline.py` chains the individual steps below, each independently
-runnable and reproducing one section of this README:
+`run_pipeline.py` chains these, each independently runnable:
 
 ```bash
-uv run python scripts/build_quality_profile.py    # pre-cleaning data-quality profile -> reports/
-uv run python scripts/clean_and_load.py           # clean -> load into SQLite, apply SQL views
-uv run python scripts/run_eda.py                  # rolling/YoY/seasonal figures -> reports/figures/
-uv run python scripts/run_stats.py                # GRAP t-tests + ANOVA -> reports/
-uv run python scripts/export_powerbi_views.py      # SQL views -> powerbi/data/*.csv
+uv run python scripts/build_quality_profile.py
+uv run python scripts/clean_and_load.py
+uv run python scripts/run_eda.py
+uv run python scripts/run_stats.py
+uv run python scripts/export_powerbi_views.py
 ```
-
-## Project status
-
-- [x] Milestone 1 — scaffold, CI, dataset sourcing decision
-- [x] Milestone 2 — data-quality profile
-- [x] Milestone 3 — cleaning pipeline + SQLite load
-- [x] Milestone 4 — SQL views
-- [x] Milestone 5 — time-series EDA
-- [x] Milestone 6 — hypothesis testing (t-tests, ANOVA) + honesty section
-- [ ] Milestone 7 — Power BI dashboard (data exported to `powerbi/data/`; `.pbix` + screenshots not yet built)
-- [x] Milestone 8 — findings & limitations write-up
