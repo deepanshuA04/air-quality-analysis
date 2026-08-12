@@ -304,6 +304,19 @@ improvement" pattern also appears in cities the policy never applied to
 — reported as a caution against attributing the change to the policy,
 alongside two cities with too little pre-period data to test at all.*
 
+## Power BI dashboard
+
+Not yet built. The data it needs is ready: `uv run python
+scripts/export_powerbi_views.py` exports every SQL view in `sql/views.sql`
+to `powerbi/data/*.csv`, so metric definitions stay in SQL rather than
+being re-derived in DAX. Planned pages: (1) city comparison overview —
+trend lines + exceedance-day counts, from `v_city_pollutant_daily` /
+`v_pm25_exceedance_summary`; (2) single-city drill-down — rolling average
++ seasonal profile, from `v_city_pollutant_daily_rolling30` /
+`v_city_monthly_profile`; (3) GRAP before/after — group means, from
+`reports/grap_before_after.csv`. Screenshots and the `.pbix` will be added
+here once built.
+
 ## Reproducing this analysis
 
 ```bash
@@ -313,8 +326,7 @@ uv run python scripts/build_quality_profile.py    # pre-cleaning data-quality pr
 uv run python scripts/clean_and_load.py           # clean -> load into SQLite, apply SQL views
 uv run python scripts/run_eda.py                  # rolling/YoY/seasonal figures -> reports/figures/
 uv run python scripts/run_stats.py                 # GRAP t-tests + ANOVA -> reports/
-# further pipeline steps (Power BI dashboard, write-up) are added as the
-# project progresses — see milestones below.
+uv run python scripts/export_powerbi_views.py       # SQL views -> powerbi/data/*.csv
 ```
 
 ## Project status
