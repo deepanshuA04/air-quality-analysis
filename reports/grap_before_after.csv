@@ -1,0 +1,9 @@
+city,status,n_pre,n_post,mean_pre,mean_post,mean_diff,pct_change,t_stat,p_value,cohens_d,significant_at_05
+Delhi,tested,302,454,203.11,175.15,-27.96,-13.8,-4.29,2.066205927422425e-05,-0.32,True
+Mumbai,insufficient_data,0,291,,61.39845017182131,,,,,,
+Kolkata,insufficient_data,0,303,,113.79957755775577,,,,,,
+Chennai,tested,275,454,60.23,52.58,-7.66,-12.7,-3.595,0.0003514367166725179,-0.273,True
+Bengaluru,tested,288,447,46.15,41.85,-4.3,-9.3,-2.575,0.010295597107461871,-0.201,True
+Hyderabad,tested,288,446,71.76,57.75,-14.01,-19.5,-4.429,1.2919167974248998e-05,-0.4,True
+Ahmedabad,tested,58,402,116.1,82.54,-33.56,-28.9,-3.718,0.0004390474082098099,-0.857,True
+Lucknow,tested,297,454,187.68,161.83,-25.85,-13.8,-4.382,1.4156506232405951e-05,-0.343,True

@@ -214,6 +214,96 @@ non-winter mean, averaged across 8 cities) — one month later than
 originally assumed, and far more pronounced in northern/inland cities
 than southern/coastal ones.*
 
+## Hypothesis testing: did GRAP change Delhi's winter PM2.5?
+
+**Intervention:** the Graded Response Action Plan (GRAP) for Delhi-NCR,
+notified 17 Jan 2017 and first operationally enforced from 17 Oct 2017
+([source](https://www.cseindia.org/graded-response-action-plan-to-control-air-pollution-in-delhi-ncr-in-very-poor-and-severe-categories-comes-into-effect-from-october-17-2017-says-epca-8506)).
+GRAP applies only to Delhi-NCR — of the 8 cities studied, only Delhi is in
+scope.
+
+**Method:** Welch's t-test comparing daily PM2.5 in the same Oct-Feb
+calendar window every year (so the comparison isn't confounded by season),
+2 pre-GRAP winters (2015-16, 2016-17) vs. 3 post-GRAP winters (2017-18,
+2018-19, 2019-20). The same test is run for **all 8 cities**, not just
+Delhi — most don't fall under GRAP, so this doubles as an informal check
+on whether "Delhi improved" is actually a GRAP effect or something
+broader. Run by `uv run python scripts/run_stats.py`.
+
+![GRAP before/after winter PM2.5 by city](reports/figures/grap_before_after_pm25.png)
+
+| City | GRAP applies? | n (pre / post) | Mean pre | Mean post | % change | p-value | Cohen's d |
+|---|---|---|---|---|---|---|---|
+| Delhi | Yes | 302 / 454 | 203.1 | 175.2 | -13.8% | 0.00002 | -0.32 |
+| Lucknow | No | 297 / 454 | 187.7 | 161.8 | -13.8% | 0.00001 | -0.34 |
+| Ahmedabad | No | **58** / 402 | 116.1 | 82.5 | -28.9% | 0.00044 | -0.86 |
+| Hyderabad | No | 288 / 446 | 71.8 | 57.8 | -19.5% | 0.00001 | -0.40 |
+| Chennai | No | 275 / 454 | 60.2 | 52.6 | -12.7% | 0.00035 | -0.27 |
+| Bengaluru | No | 288 / 447 | 46.2 | 41.9 | -9.3% | 0.0103 | -0.20 |
+| Mumbai | No | **0** / 291 | — | 61.4 | — | insufficient pre-GRAP data | — |
+| Kolkata | No | **0** / 303 | — | 113.8 | — | insufficient pre-GRAP data | — |
+
+Full output: `reports/grap_before_after.csv`.
+
+### One-way ANOVA: does PM2.5 differ across the 8 cities?
+
+Full study period, daily PM2.5 averages, all 8 cities as groups:
+**F = 607.8, p < 0.001, η² = 0.26** — city is associated with about 26% of
+the variance in daily PM2.5. Group means range from Bengaluru/Mumbai
+(~35 µg/m³) to Delhi (118 µg/m³) and Lucknow (110 µg/m³); full table in
+`reports/anova_pm25_group_means.csv`.
+
+### The honest reading of the GRAP result
+
+Every one of the 6 testable cities shows a **statistically significant
+decrease** in winter PM2.5 after Oct 2017 — including five cities where
+GRAP was never implemented. Delhi's decline (-13.8%) is smaller in
+percentage terms than Ahmedabad's (-28.9%) and Hyderabad's (-19.5%),
+neither of which is under GRAP. **This is not evidence that GRAP had no
+effect — but it is clear evidence that a simple before/after comparison
+cannot isolate one.** If a policy that only applies to Delhi produced a
+Delhi improvement no larger than the improvement in cities with no such
+policy, the most defensible reading is that something broader than GRAP
+(year-to-year weather variability, a general improving trend across urban
+India in this period, monitoring/instrumentation changes, or the specific
+two pre-GRAP winters happening to be unusually bad) is driving most of
+what this test measures.
+
+**Data-coverage misses, reported rather than hidden:** Mumbai and Kolkata
+have **zero** valid PM2.5 days in the pre-GRAP window (Mumbai's PM2.5
+sensor didn't report until 2018; Kolkata's station started in April 2018)
+— they cannot be tested for this comparison at all, and are reported as
+"insufficient data," not silently dropped or padded. Ahmedabad's pre-GRAP
+sample is real but thin (58 days vs. ~300 for other cities) because of the
+coverage gaps documented in the data-quality profile; its result is
+included but should be weighted with that in mind.
+
+### What this analysis cannot tell you
+
+This is a before/after observational comparison of two non-randomly-chosen
+time windows, not a controlled experiment, and it cannot establish that
+GRAP *caused* any change in PM2.5. Weather varies year to year and was not
+controlled for; India's COVID-19 lockdown (from 25 Mar 2020) falls inside
+the post-GRAP window and suppressed traffic/industrial emissions for
+reasons entirely unrelated to GRAP; other concurrent policies (odd-even
+vehicle rationing, the 2017 Delhi-NCR firecracker restrictions, BS-VI fuel
+standards from Apr 2020) overlap the same post-period and cannot be
+separated from GRAP's effect with this method; and CPCB's monitoring
+network itself changed over this period (new stations coming online, as
+seen directly in Kolkata's and Mumbai's coverage gaps), which can shift a
+city's measured average independent of true ambient pollution. Concluding
+"GRAP reduced Delhi's PM2.5 by 13.8%" from this analysis alone would be
+overstating what a two-sample t-test on observational time-series data can
+support — the ANOVA and t-test results describe what the data shows, not
+what a specific policy caused.
+
+**Resume bullet, updated to match reality:** *Ran Welch's t-tests and a
+one-way ANOVA to compare pollution levels before and after a real policy
+intervention (Delhi's GRAP), finding that the same "significant
+improvement" pattern also appears in cities the policy never applied to
+— reported as a caution against attributing the change to the policy,
+alongside two cities with too little pre-period data to test at all.*
+
 ## Reproducing this analysis
 
 ```bash
@@ -222,8 +312,9 @@ uv run python scripts/download_data.py           # fetch raw CSVs (needs Kaggle 
 uv run python scripts/build_quality_profile.py    # pre-cleaning data-quality profile -> reports/
 uv run python scripts/clean_and_load.py           # clean -> load into SQLite, apply SQL views
 uv run python scripts/run_eda.py                  # rolling/YoY/seasonal figures -> reports/figures/
-# further pipeline steps (hypothesis testing) are added as the project
-# progresses — see milestones below.
+uv run python scripts/run_stats.py                 # GRAP t-tests + ANOVA -> reports/
+# further pipeline steps (Power BI dashboard, write-up) are added as the
+# project progresses — see milestones below.
 ```
 
 ## Project status
@@ -233,6 +324,6 @@ uv run python scripts/run_eda.py                  # rolling/YoY/seasonal figures
 - [x] Milestone 3 — cleaning pipeline + SQLite load
 - [x] Milestone 4 — SQL views
 - [x] Milestone 5 — time-series EDA
-- [ ] Milestone 6 — hypothesis testing (t-tests, ANOVA) + honesty section
+- [x] Milestone 6 — hypothesis testing (t-tests, ANOVA) + honesty section
 - [ ] Milestone 7 — Power BI dashboard
 - [ ] Milestone 8 — findings & limitations write-up
