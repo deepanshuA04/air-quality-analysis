@@ -7,6 +7,37 @@ across 8 Indian cities: data cleaning, time-series trend analysis, and
 before/after hypothesis testing of real policy interventions, with a SQL layer
 and a Power BI monitoring dashboard.
 
+## Key findings & recommendation
+
+**Concentrate enforcement and public health advisories in the October-February
+window.** Across the 8 cities studied, average PM2.5 in this window is 123%
+higher than the rest of the year, and the pattern repeats every single year
+in the data (2015-2020) — it is not one bad winter dragging up an average.
+Delhi crosses the CPCB 24-hour PM2.5 standard on 73% of measured days
+overall; Bengaluru, on the other end, crosses it on 9.6% of days. A single
+national advisory calendar is a poor fit for both — the case for
+concentrating limited enforcement capacity (odd-even schemes, construction
+bans, stubble-burning coordination with neighboring states) in this specific
+five-month window is strongest for the northern/inland cities in the sample
+(Delhi, Lucknow, Kolkata, Ahmedabad), where winter PM2.5 runs 63-259% above
+the rest of the year, and weakest for the southern/coastal cities (Chennai,
+Bengaluru), where the seasonal swing is much smaller (18-45%).
+
+**On whether Delhi's GRAP policy is responsible for its improvement: the data
+does not support that conclusion.** Winter PM2.5 fell significantly in Delhi
+after GRAP started (-13.8%, p<0.001) — but it also fell significantly in
+five other cities where GRAP was never implemented, two of them by more than
+Delhi did. The honest takeaway for a policy audience is not "GRAP failed" or
+"GRAP worked" — it's that a before/after comparison on its own cannot tell
+the two apart, and claiming otherwise would overstate the evidence. See
+[What this analysis cannot tell you](#what-this-analysis-cannot-tell-you)
+below.
+
+Everything below is the evidence and method behind these two paragraphs —
+every number in this README is reproduced by the scripts in `scripts/`, not
+typed by hand (`uv run python scripts/download_data.py && ... `, full
+sequence in [Reproducing this analysis](#reproducing-this-analysis)).
+
 ## Dataset
 
 | | |
@@ -317,16 +348,69 @@ trend lines + exceedance-day counts, from `v_city_pollutant_daily` /
 `reports/grap_before_after.csv`. Screenshots and the `.pbix` will be added
 here once built.
 
+## Limitations
+
+Beyond the GRAP-specific caveats above, some project-wide scope decisions
+are worth stating plainly rather than leaving implicit:
+
+- **The statistical toolkit is deliberately simple** — rolling averages,
+  year-on-year comparison, Welch's t-tests, one-way ANOVA, and the
+  correlation/effect-size reporting that goes with them. Nothing here uses
+  seasonal decomposition (STL), ARIMA, or a causal-inference framework
+  (difference-in-differences, synthetic control). The seasonal pattern in
+  this data is visually and empirically obvious enough (see the seasonal
+  profile chart) that a decomposition model isn't needed to detect it; a
+  proper causal estimate of GRAP's effect would need one of those causal
+  frameworks (plus weather and traffic controls this dataset doesn't have)
+  and is explicitly out of scope here rather than approximated with a
+  simpler test dressed up as one.
+- **No multiple-comparisons correction was applied** across the 6 GRAP
+  t-tests. At α=0.05 across 6 independent tests, some chance of at least
+  one false positive exists by construction. What makes chance an
+  unconvincing full explanation here is that all 6 tests agreed in
+  direction and five of six were significant at p<0.02 — but this is a
+  scope simplification (per this project's brief, Holm/Bonferroni-style
+  corrections were deliberately left out as beyond entry-level scope), not
+  a claim that correction wouldn't matter in a stricter analysis.
+- **The 8 cities are the highest-coverage cities in the source file, not a
+  random or representative sample** of Indian cities — see "Coverage vs.
+  the original plan" above. Findings describe these 8 cities specifically.
+- **PM2.5 is the analytical focus.** The cleaned dataset and SQL views
+  cover all 12 monitored pollutants (PM10, NO, NO2, NOx, NH3, CO, SO2, O3,
+  Benzene, Toluene, Xylene), but the EDA, hypothesis testing, and
+  recommendation concentrate on PM2.5 as the dominant public-health
+  pollutant in Indian winters. The other pollutants are cleaned,
+  queryable, and available in `powerbi/data/`, but not deeply analyzed
+  here.
+- **Missing data is left missing, not imputed, for gaps beyond 6 hours** —
+  by design (see the cleaning rules table) — which means every average in
+  this README is computed only over the hours/days that were actually
+  measured. If sensors are systematically more likely to go offline during
+  the worst pollution events (a plausible failure mode for real hardware),
+  the true winter spike could be even larger than what's reported here;
+  this dataset cannot confirm or rule that out.
+- **The Power BI dashboard (milestone 7) is not yet built** — see the
+  Power BI section above for what's ready and what's planned.
+
 ## Reproducing this analysis
 
 ```bash
 uv sync --frozen
-uv run python scripts/download_data.py           # fetch raw CSVs (needs Kaggle credentials)
+uv run python scripts/download_data.py    # fetch raw CSVs once (needs a Kaggle API token)
+uv run python scripts/run_pipeline.py     # everything else: profile -> clean -> SQLite ->
+                                           # SQL views -> EDA figures -> hypothesis tests ->
+                                           # Power BI CSV export
+```
+
+`run_pipeline.py` chains the individual steps below, each independently
+runnable and reproducing one section of this README:
+
+```bash
 uv run python scripts/build_quality_profile.py    # pre-cleaning data-quality profile -> reports/
 uv run python scripts/clean_and_load.py           # clean -> load into SQLite, apply SQL views
 uv run python scripts/run_eda.py                  # rolling/YoY/seasonal figures -> reports/figures/
-uv run python scripts/run_stats.py                 # GRAP t-tests + ANOVA -> reports/
-uv run python scripts/export_powerbi_views.py       # SQL views -> powerbi/data/*.csv
+uv run python scripts/run_stats.py                # GRAP t-tests + ANOVA -> reports/
+uv run python scripts/export_powerbi_views.py      # SQL views -> powerbi/data/*.csv
 ```
 
 ## Project status
@@ -337,5 +421,5 @@ uv run python scripts/export_powerbi_views.py       # SQL views -> powerbi/data/
 - [x] Milestone 4 — SQL views
 - [x] Milestone 5 — time-series EDA
 - [x] Milestone 6 — hypothesis testing (t-tests, ANOVA) + honesty section
-- [ ] Milestone 7 — Power BI dashboard
-- [ ] Milestone 8 — findings & limitations write-up
+- [ ] Milestone 7 — Power BI dashboard (data exported to `powerbi/data/`; `.pbix` + screenshots not yet built)
+- [x] Milestone 8 — findings & limitations write-up
