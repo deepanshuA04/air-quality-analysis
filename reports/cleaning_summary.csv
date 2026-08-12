@@ -1,0 +1,5 @@
+quality_flag,rows,pct
+ok,3075675,71.84
+missing_long_gap,991126,23.15
+outlier_seasonal,181673,4.24
+interpolated,32670,0.76

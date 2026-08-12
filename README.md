@@ -105,21 +105,42 @@ preserved rather than backfilled with fabricated pre-2018 values.
 | Long gaps (>6h) → left missing | `cleaning.interpolate_short_gaps` | Interpolating a multi-day or multi-week outage would invent data with no basis — these are left as `NaN` with a `missing_long_gap` quality flag rather than filled in. |
 | Outliers → flagged, not dropped | `cleaning.flag_outliers_iqr` | IQR fences computed **per city, per pollutant, per calendar month** (not a single global threshold) — Delhi winter PM2.5 routinely runs 300-900 µg/m³, which a global fence would flag as an outlier on every winter night. A per-month fence lets each city's own seasonal baseline define what's unusual for that city in that season. Flagged values are kept (with a flag) rather than removed, since "unusual for this city-month" is not the same as "wrong." |
 
+### Cleaning pipeline results
+
+Run by `uv run python scripts/clean_and_load.py`, which applies the four
+rules above (in order: impossible → interpolate short gaps → flag seasonal
+outliers) to all 4,281,144 city×hour×pollutant rows and loads the result
+into SQLite (`data/processed/air_quality.sqlite`, gitignored — rebuilt by
+the script, not committed):
+
+| `quality_flag` | Rows | % of total |
+|---|---|---|
+| `ok` (genuine reading, unflagged) | 3,075,675 | 71.84% |
+| `missing_long_gap` (left missing — gap too long or unbounded) | 991,126 | 23.15% |
+| `outlier_seasonal` (genuine reading, unusual for its city-month) | 181,673 | 4.24% |
+| `interpolated` (short gap, linearly filled) | 32,670 | 0.76% |
+
+The `missing_long_gap` share (23%) is dominated by pollutants/cities with
+low sensor uptime identified in the data-quality profile above (e.g. PM10,
+Xylene, Mumbai's pre-2018 PM2.5 gap) — those gaps are reported as missing,
+not invented.
+
 ## Reproducing this analysis
 
 ```bash
 uv sync --frozen
 uv run python scripts/download_data.py           # fetch raw CSVs (needs Kaggle credentials)
 uv run python scripts/build_quality_profile.py    # pre-cleaning data-quality profile -> reports/
-# further pipeline steps (cleaning, SQL load, EDA, stats) are added as the
-# project progresses — see milestones below.
+uv run python scripts/clean_and_load.py           # clean -> load into SQLite
+# further pipeline steps (SQL views, EDA, stats) are added as the project
+# progresses — see milestones below.
 ```
 
 ## Project status
 
 - [x] Milestone 1 — scaffold, CI, dataset sourcing decision
 - [x] Milestone 2 — data-quality profile
-- [ ] Milestone 3 — cleaning pipeline + SQLite load
+- [x] Milestone 3 — cleaning pipeline + SQLite load
 - [ ] Milestone 4 — SQL views
 - [ ] Milestone 5 — time-series EDA
 - [ ] Milestone 6 — hypothesis testing (t-tests, ANOVA) + honesty section
