@@ -240,6 +240,12 @@ can't be tested at all: both have zero valid PM2.5 days in the pre-GRAP
 window (Mumbai's sensor wasn't reporting yet; Kolkata's station didn't
 exist until April 2018).
 
+That's 6 t-tests at α=0.05 with no multiple-comparisons correction, so in
+principle one of the 6 p-values could be a false positive. In practice all
+6 agreed in direction and 5 were significant at p<0.02, which is not the
+pattern you'd expect from chance alone — the multiple-comparisons caveat
+is real but it isn't what's driving the conclusion below.
+
 **One-way ANOVA** across all 8 cities, full study period: F = 607.8,
 p < 0.001, η² = 0.26 — city explains about a quarter of the variance in
 daily PM2.5. Group means range from ~35 µg/m³ (Bengaluru, Mumbai) to 118
@@ -288,11 +294,9 @@ seasonal profile), and a GRAP before/after page. Screenshots and the
   obvious enough without a decomposition model; a real causal estimate of
   GRAP's effect would need weather/traffic controls this dataset doesn't
   have, and that's out of scope here rather than faked with a simpler test.
-- No multiple-comparisons correction across the 6 GRAP t-tests — at
-  α=0.05 across 6 tests there's some chance of a false positive by
-  construction, though all 6 agreed in direction and 5 were significant at
-  p<0.02. Left uncorrected as a scope decision, not because it's the
-  statistically ideal approach.
+- No multiple-comparisons correction across the 6 GRAP t-tests (see the
+  GRAP section above) — left uncorrected as a scope decision, not because
+  it's the statistically ideal approach.
 - The 8 cities are the ones with the best data coverage in the source
   file, not a random sample — the findings describe these 8 specifically.
 - PM2.5 is the focus pollutant. The other 11 (PM10, NO, NO2, NOx, NH3, CO,
