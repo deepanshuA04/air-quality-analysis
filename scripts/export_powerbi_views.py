@@ -6,11 +6,12 @@ Run: uv run python scripts/export_powerbi_views.py
 
 from __future__ import annotations
 
+import shutil
 import sqlite3
 
 import pandas as pd
 
-from air_quality_analysis.config import DB_PATH, ROOT
+from air_quality_analysis.config import DB_PATH, REPORTS_DIR, ROOT
 
 POWERBI_DIR = ROOT / "powerbi" / "data"
 
@@ -24,6 +25,11 @@ VIEWS = [
     "v_pm25_exceedance_summary",
 ]
 
+# Hypothesis-testing outputs (already computed by run_stats.py) copied
+# alongside the SQL views so every source the dashboard needs lives in
+# one folder.
+STATS_FILES = ["grap_before_after.csv", "anova_pm25_group_means.csv"]
+
 
 def main() -> None:
     POWERBI_DIR.mkdir(parents=True, exist_ok=True)
@@ -36,6 +42,12 @@ def main() -> None:
             print(f"{view}: {len(df):,} rows -> {out_path}")
     finally:
         conn.close()
+
+    for name in STATS_FILES:
+        src = REPORTS_DIR / name
+        dest = POWERBI_DIR / name
+        shutil.copyfile(src, dest)
+        print(f"copied {src} -> {dest}")
 
 
 if __name__ == "__main__":

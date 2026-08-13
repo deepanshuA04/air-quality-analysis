@@ -278,12 +278,14 @@ Delhi's PM2.5 by 13.8%" is more than this analysis can support on its own.
 
 Not built yet — Power BI Desktop is a GUI tool with no scriptable path, so
 this needs to be done by hand rather than by a script. The data is ready:
-`uv run python scripts/export_powerbi_views.py` exports every SQL view to
-`powerbi/data/*.csv`, so the dashboard reads metric definitions from SQL
-instead of redoing them in DAX. Planned: a city comparison page (trend
-lines + exceedance counts), a single-city drill-down (rolling average +
-seasonal profile), and a GRAP before/after page. Screenshots and the
-`.pbix` go here once it exists.
+`uv run python scripts/export_powerbi_views.py` exports every SQL view
+plus the GRAP/ANOVA results to `powerbi/data/*.csv`, so the dashboard
+reads metric definitions from SQL instead of redoing them in DAX.
+
+`powerbi/BUILD_SPEC.md` has the exact build: a star schema (`Dim_Date`,
+`Dim_City`, 6 fact tables), the DAX measures, and the visual/field layout
+for all 3 pages (city comparison, single-city drill-down, GRAP
+before/after). Screenshots and the `.pbix` go here once it's built.
 
 ## Limitations
 
